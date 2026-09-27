@@ -1,101 +1,122 @@
-# Enemy AI Dungeon — Deteksi Player, Pathfinding, dan Movement
+# Jawaban Tugas Pertemuan 1
 
-## 1. Identifikasi Algoritma
-
-Algoritma yang digunakan adalah kombinasi:
-
-1. **Distance/Range Detection**
-   - Enemy menghitung jarak antara posisi enemy dan player.
-   - Jika jarak <= detection range, player dianggap terdeteksi.
-
-2. **A* (A-Star) Pathfinding**
-   - Setelah player terdeteksi dan berada dalam jangkauan, enemy mencari jalur menuju player.
-   - A* menggunakan:
-     - `g(n)` = biaya dari posisi awal ke node saat ini.
-     - `h(n)` = estimasi jarak dari node saat ini ke player.
-     - `f(n) = g(n) + h(n)`.
-
-3. **Movement Following Path**
-   - Enemy bergerak menuju node-node yang dihasilkan A*.
-   - Ketika posisi player berubah, path dapat dihitung ulang agar enemy terus mengejar player.
-
-### Alur singkat
-
-**Deteksi player → cek range → A* mencari jalur → enemy bergerak mengikuti path → ulangi.**
+**Identitas Mahasiswa:**
+- **Nama:** Muhammad Geraldi Arisyi
+- **Email:** geraldiarisyi27@gmail.com
 
 ---
 
-## 2. Flowchart
+### Soal:
+> *"Player bergerak di dalam sebuah dungeon. Enemy harus mendeteksi player, menentukan apakah player berada dalam jangkauan, mencari jalur menuju player, kemudian bergerak menuju player."*
+
+---
+
+## 1. Analisis & Identifikasi Algoritma
+
+Penyelesaian masalah ini menggunakan kombinasi tiga komponen utama:
+
+1. **Range Detection (Deteksi Jarak Jangkauan)**
+   - Menghitung jarak posisi Enemy $(x_e, y_e)$ terhadap Player $(x_p, y_p)$.
+   - Menggunakan perbandingan jarak Euclidean kuadrat untuk efisiensi komputasi:
+     $$\Delta x^2 + \Delta y^2 \le \text{Detection Range}^2$$
+   - **Aturan:** Jika jarak $\le$ detection range, Player terdeteksi dan Enemy mulai mengejar. Jika tidak, Enemy berstatus diam/patroli.
+
+2. **A* (A-Star) Pathfinding (Pencarian Jalur Terpendek)**
+   - Setelah Player terdeteksi, algoritma A* mencari jalur terpendek dari posisi Enemy ke posisi Player dengan menghindari rintangan/tembok (`1`).
+   - Fungsi evaluasi:
+     $$f(n) = g(n) + h(n)$$
+     - $g(n)$: Biaya langkah nyata dari titik awal Enemy ke petak saat ini.
+     - $h(n)$: Estimasi jarak sisa ke Player menggunakan **Manhattan Distance** (karena gerakan orthogonal 4 arah):
+       $$h(n) = |x_n - x_{\text{player}}| + |y_n - y_{\text{player}}|$$
+     - $f(n)$: Total perkiraan biaya. Petak dengan $f(n)$ terendah diprioritaskan dieksplorasi menggunakan `priority_queue` (min-heap).
+
+3. **Movement Execution (Pergerakan Mengikuti Jalur)**
+   - Enemy melangkah ke simpul/petak berikutnya pada rute (`path[1]`).
+   - Pada setiap giliran, posisi diperbarui dan jalur dihitung ulang secara dinamis mengikuti pergerakan Player.
+
+---
+
+## 2. Diagram Alir (Flowchart)
 
 ```mermaid
 flowchart TD
-    A([Start]) --> B[Enemy membaca posisi Player]
+    A([Mulai]) --> B[Enemy membaca posisi Player]
     B --> C[Hitung jarak Enemy ke Player]
     C --> D{Jarak <= Detection Range?}
 
-    D -- Tidak --> E[Enemy tetap / Patrol]
-    E --> B
+    D -- Tidak --> E[Status: Di Luar Jangkauan / Enemy Diam]
+    E --> F[Menunggu Giliran Berikutnya]
+    F --> B
 
-    D -- Ya --> F[Ambil posisi Enemy dan Player]
-    F --> G[A* mencari path pada dungeon]
-    G --> H{Path ditemukan?}
+    D -- Ya --> G[Status: Player Terdeteksi!]
+    G --> H[Jalankan A* Pathfinding hindari tembok]
+    H --> I{Jalur Ditemukan?}
 
-    H -- Tidak --> I[Enemy berhenti / cari ulang]
-    I --> B
+    I -- Tidak --> J[Enemy terhalang tembok / berhenti]
+    J --> F
 
-    H -- Ya --> J[Ambil node berikutnya pada path]
-    J --> K[Enemy bergerak menuju node]
-    K --> L{Sudah dekat dengan Player?}
+    I -- Ya --> K[Ambil petak berikutnya pada jalur]
+    K --> L[Enemy melangkah ke petak tersebut]
+    L --> M{Enemy mencapai posisi Player?}
 
-    L -- Ya --> M[Enemy menyerang / berhenti mengejar]
-    M --> B
-
-    L -- Tidak --> N{Player masih dalam range?}
-    N -- Ya --> B
-    N -- Tidak --> E
+    M -- Ya --> N([Selesai: Player Tertangkap / Game Over])
+    M -- Tidak --> F
 ```
 
 ---
 
-## 3. Code Snippet C++
+## 3. Struktur Modul Kode
 
-Contoh menggunakan **grid 2D** sebagai dungeon. Nilai `0` adalah jalan dan `1` adalah tembok.
+Program dipecah secara modular (*Separation of Concerns*) agar kode bersih dan mudah dipahami:
 
-Lihat implementasi lengkap pada [main.cpp](./main.cpp).
+| File | Peran & Tanggung Jawab |
+| :--- | :--- |
+| **[AStar.h](./AStar.h)** | Modul Algoritma: struktur `Point`, `Node`, heuristik Manhattan, deteksi jangkauan, dan fungsi `aStar()`. |
+| **[Dungeon.h](./Dungeon.h)** | Modul Game Engine: visualisasi peta dungeon ASCII (`renderDungeon`) dan logika perputaran giliran (`enemyTurn`). |
+| **[main.cpp](./main.cpp)** | File Utama: inisialisasi matriks dungeon, pengaturan range deteksi, dan menu mode permainan. |
 
-### Inti algoritma
+---
 
-```cpp
-while (gameRunning) {
+## 4. Kesimpulan
 
-    if (isPlayerInRange(enemy, player, detectionRange)) {
+1. **Range Detection** berhasil membatasi area kewaspadaan musuh agar tidak mengejar Player yang berada di luar jangkauan.
+2. **Algoritma A*** secara optimal menemukan rute terpendek menuju target di dalam labirin berpenghalang tembok dengan mengevaluasi biaya langkah terkecil $f(n) = g(n) + h(n)$.
+3. **Turn-based Movement** memungkinkan simulasi dinamis di mana Enemy mengejar langkah demi langkah hingga Player tertangkap.
 
-        vector<Point> path =
-            aStar(dungeon, enemy, player);
+---
+---
 
-        if (!path.empty()) {
-            moveEnemyAlongPath(path);
-        }
-    }
-}
+# PANDUAN MENJALANKAN PROGRAM (HOW TO RUN)
+*(Bagian Teknis Pengujian)*
+
+### 1. Kompilasi Program (Menggunakan g++)
+Buka terminal (Git Bash / PowerShell / CMD) di folder proyek, lalu jalankan:
+```bash
+g++ -static -O2 main.cpp -o dungeon.exe
 ```
 
-### Cara kerja
+### 2. Menjalankan File Hasil Kompilasi
+- **Di Git Bash / Linux / macOS:**
+  ```bash
+  ./dungeon.exe
+  ```
+- **Di PowerShell / Command Prompt (CMD):**
+  ```powershell
+  .\dungeon.exe
+  ```
 
-Misalnya posisi:
+### 3. Pilihan Mode Permainan
+Saat program dijalankan, pilih mode yang diinginkan:
+- **Mode 1 (Simulasi Otomatis - Sangat Direkomendasikan untuk Demo Dosen):**
+  Player akan bergerak otomatis sesuai skenario rute, lalu Enemy mendeteksi dan mengejar. Cukup tekan `[Enter]` di setiap giliran untuk melihat perubahan status dan langkah pergerakannya.
+- **Mode 2 (Kontrol Manual):**
+  Pemain mengontrol karakter Player secara interaktif menggunakan tombol:
+  - `W` = Atas, `S` = Bawah, `A` = Kiri, `D` = Kanan, `Q` = Keluar.
 
-- Enemy = `(4, 0)`
-- Player = `(0, 5)`
-
-Program melakukan:
-
-1. Menghitung jarak enemy ke player.
-2. Mengecek apakah player masuk detection range.
-3. Menjalankan A* jika player terdeteksi.
-4. Menghindari cell yang merupakan tembok.
-5. Menghasilkan path dari enemy ke player.
-6. Enemy mengikuti node-node pada path tersebut.
-
-## Kesimpulan
-
-Algoritma utama untuk **mencari jalur menuju player** adalah **A***. Sebelum pathfinding dilakukan, enemy menggunakan **range detection** untuk menentukan apakah player berada dalam jangkauan pengejaran. Setelah path ditemukan, enemy bergerak mengikuti jalur tersebut.
+### 4. Keterangan Simbol Peta di Terminal
+- `[P]` : Posisi Player
+- `[E]` : Posisi Enemy
+- `###` : Tembok penghalang
+- ` . ` : Jalan kosong
+- ` * ` : Rute jalur A* yang sedang direncanakan Enemy
+- `[!]` : Kondisi saat Player berhasil ditangkap oleh Enemy
